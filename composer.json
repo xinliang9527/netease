@@ -1,0 +1,22 @@
+{
+    "name": "xinliang/netease",
+    "description": "网易云信restapi",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "xinliang",
+            "email": "445604478@qq.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.6",
+        "guzzlehttp/guzzle": "^6.4"
+    },
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Xinliang\\Netease\\": "src/"
+        }
+    }
+}
