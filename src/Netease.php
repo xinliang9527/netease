@@ -2,6 +2,8 @@
 
 namespace Xinliang\Netease;
 
+use Carbon\Carbon;
+use Illuminate\Support\Str;
 use Xinliang\Netease\Exceptions\HttpException;
 use Xinliang\Netease\Traits\HasHttpRequest;
 
@@ -10,56 +12,47 @@ class Netease
     use HasHttpRequest;
     private  $AppKey;
     private  $AppSecret;
-    const ENDPOINT_TEMPLATE = 'https://api.netease.im/nimserver/';
+    private  $Nonce;
+    private  $CurTime;
+    private  $CheckSum;
 
-    public function __construct($AppKey = '',$AppSecret = '')
+    const ENDPOINT_TEMPLATE = 'https://api.netease.im/nimserver/%s/%s';
+
+    public function __construct()
     {
-//        $this->config = ;
-        $this->AppKey = $AppKey;
-        $this->AppSecret = $AppSecret;
+        $neteaseConfig = config('netease');
+        $this->AppKey = $neteaseConfig['AppKey'];
+        $this->AppSecret = $neteaseConfig['AppSecret'];
     }
-
 
     public function send($servername, $command, array $params = [])
     {
         try {
-            $result = $this->postJson($this->buildEndpoint($servername, $command), $params);
+            $this->checkSumBuilder();
+            $headers = [
+                'AppKey' => $this->AppKey,
+                'Nonce' => $this->Nonce,
+                'CurTime' => $this->CurTime,
+                'CheckSum' => $this->CheckSum,
+            ];
+            $result = $this->post($this->buildEndpoint($servername, $command),$params,$headers);
         } catch (\Exception $e) {
             throw new HttpException($e->getMessage(), $e->getCode(), $e);
         }
-
-        if (0 === $result['ErrorCode'] && 'OK' === $result['ActionStatus']) {
-            return $result;
-        }
-        return false;
+        return $result;
     }
 
     protected function buildEndpoint(string $servername, string $command): string
     {
-        $query = http_build_query([
-            'AppKey' => $this->config->get('sdk_app_id'),
-            'identifier' => $this->config->get('identifier'),
-            'usersig' => $this->generateSign($this->config->get('identifier')),
-            'random' => mt_rand(0, 4294967295),
-            'contenttype' => self::ENDPOINT_FORMAT,
-        ]);
-
-        return \sprintf(self::ENDPOINT_TEMPLATE, self::ENDPOINT_VERSION, $servername, $command, $query);
+        return \sprintf(self::ENDPOINT_TEMPLATE,  $servername, $command);
     }
 
-    public function checkSumBuilder()
+    protected function checkSumBuilder()
     {
-        //此部分生成随机字符串
-        $hex_digits = self::HEX_DIGITS;
-        $this->Nonce = '';
-        for ($i = 0; $i < 128; ++$i) {            //随机字符串最大128个字符，也可以小于该数
-            $this->Nonce .= $hex_digits[rand(0, 15)];
-        }
-        $this->CurTime = (string) (time());    //当前时间戳，以秒为单位
-
+        $this->Nonce = Str::random(32);
+        $this->CurTime = Carbon::now()->timestamp; //当前时间戳，以秒为单位
         $join_string = $this->AppSecret.$this->Nonce.$this->CurTime;
         $this->CheckSum = sha1($join_string);
-        //print_r($this->CheckSum);
     }
 
 
